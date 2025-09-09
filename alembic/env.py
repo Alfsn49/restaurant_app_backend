@@ -13,7 +13,7 @@ from app.models import user, rol, categoria, cliente, detalle_factura, factura, 
 config = context.config
 
 # ⚡ Aquí inyectas la URL del .env en lugar de usar la de alembic.ini
-config.set_main_option("sqlalchemy.url", settings.DATABASE_SUPABASE.replace("+asyncpg", ""))
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("+asyncpg", ""))
 
 
 # Interpret the config file for Python logging.
