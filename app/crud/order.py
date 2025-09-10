@@ -161,7 +161,7 @@ def cancelar_orden(id_orden: str, db: Session):
         raise ValueError(f"No existe una orden con id {id_orden}")
 
     # 2️⃣ Validar que no esté ya cancelada
-    if orden.estado == "Cancelado":
+    if orden.estado == "Anulado":
         raise ValueError(f"La orden {id_orden} ya está cancelada")
 
     # 3️⃣ Iterar por los detalles y devolver el stock
@@ -179,7 +179,7 @@ def cancelar_orden(id_orden: str, db: Session):
             db.add(inventario)
 
     # 4️⃣ Actualizar estado de la orden
-    orden.estado = "Cancelado"
+    orden.estado = "Anulado"
     db.add(orden)
 
     # 5️⃣ Guardar cambios
