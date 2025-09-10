@@ -12,6 +12,7 @@ class Orden(Base):
 
     numero_orden: Mapped[int] = mapped_column(Integer, nullable=False)
     fecha: Mapped[DateTime] = mapped_column(DateTime,default=datetime.now)
+    estado: Mapped[str] = mapped_column(String, nullable=True)
     sucursal_id: Mapped[str] = mapped_column(ForeignKey("sucursales.id"))
     sucursal: Mapped["Sucursal"] = relationship("Sucursal", back_populates="ordenes")
 

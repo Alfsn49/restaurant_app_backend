@@ -1,7 +1,5 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import select, func
 from app.models.orden import Orden, OrdenDetalle
 from app.models.producto_variante import Producto_Variante
 from app.models.product import Product
@@ -10,7 +8,7 @@ from app.models.sucursal import Sucursal
 from datetime import datetime
 
 
-async def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime, db: AsyncSession):
+def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
     query = (
         select(Orden)
         .options(
@@ -27,11 +25,11 @@ async def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: da
         .order_by(Orden.fecha.desc())
     )
 
-    result = await db.execute(query)
+    result = db.execute(query)
     ordenes = result.scalars().all()
 
     total_ventas = sum(
-        sum(detalle.subtotal for detalle in orden.detalles_orden) 
+        sum(detalle.subtotal for detalle in orden.detalles_orden)
         for orden in ordenes
     )
 

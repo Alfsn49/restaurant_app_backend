@@ -1,3 +1,4 @@
+from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from sqlalchemy.orm import selectinload
@@ -9,11 +10,11 @@ from app.models.inventario import Inventario
 
 from datetime import datetime
 
-async def crear_orden(db: AsyncSession, orden_data: dict, imprimir_local=True):
+def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
     sucursal_id = orden_data["sucursal_id"]
 
     # 1️⃣ Obtener último número de orden
-    result = await db.execute(
+    result = db.execute(
         select(Orden)
         .where(Orden.sucursal_id == sucursal_id)
         .order_by(desc(Orden.numero_orden))
@@ -22,9 +23,9 @@ async def crear_orden(db: AsyncSession, orden_data: dict, imprimir_local=True):
     next_order_number = 1 if not last_order else last_order.numero_orden + 1
 
     # 2️⃣ Crear orden
-    orden = Orden(numero_orden=next_order_number, sucursal_id=sucursal_id)
+    orden = Orden(numero_orden=next_order_number, sucursal_id=sucursal_id, estado = "Pagado")
     db.add(orden)
-    await db.flush()
+    db.flush()
 
     # 3️⃣ Crear detalles y actualizar inventario
     for item in orden_data["items"]:
@@ -38,7 +39,7 @@ async def crear_orden(db: AsyncSession, orden_data: dict, imprimir_local=True):
         db.add(detalle)
 
         # 🔹 Reducir inventario
-        result_inv = await db.execute(
+        result_inv = db.execute(
             select(Inventario)
             .where(
                 Inventario.producto_variante_id == item["product_variante_id"],
@@ -58,11 +59,11 @@ async def crear_orden(db: AsyncSession, orden_data: dict, imprimir_local=True):
         inventario.cantidad -= item["cantidad"]
         db.add(inventario)
 
-    await db.commit()
-    await db.refresh(orden)
+    db.commit()
+    db.refresh(orden)
 
     # 4️⃣ Cargar sucursal y local
-    result = await db.execute(
+    result = db.execute(
         select(Orden)
         .options(selectinload(Orden.sucursal).selectinload(Sucursal.local))
         .where(Orden.id == orden.id)
@@ -70,7 +71,7 @@ async def crear_orden(db: AsyncSession, orden_data: dict, imprimir_local=True):
     orden = result.scalars().first()
 
     # 5️⃣ Consultar detalles con productos y zonas
-    result = await db.execute(
+    result = db.execute(
         select(OrdenDetalle)
         .options(
             selectinload(OrdenDetalle.producto_variantes)
@@ -139,9 +140,54 @@ async def crear_orden(db: AsyncSession, orden_data: dict, imprimir_local=True):
 
 
 
-async def list_ordenes(id_sucursal:str, fecha_inicio: datetime, fecha_fin: datetime, db: AsyncSession):
+def list_ordenes(id_sucursal:str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
 
-    result = await db.execute(select(Orden).options(selectinload(Orden.detalles_orden)).where(Orden.sucursal_id == id_sucursal, 
+    result =  db.execute(select(Orden).options(selectinload(Orden.detalles_orden)).where(Orden.sucursal_id == id_sucursal, 
     func.date(Orden.fecha) >= fecha_inicio.date(), func.date(Orden.fecha) <= fecha_fin.date()).order_by((Orden.fecha.desc())))
 
     return result.scalars().all()
+
+
+def cancelar_orden(id_orden: str, db: Session):
+    # 1️⃣ Buscar la orden
+    result = db.execute(
+        select(Orden)
+        .options(selectinload(Orden.detalles_orden))  # cargamos también los detalles
+        .where(Orden.id == id_orden)
+    )
+    orden = result.scalars().first()
+
+    if not orden:
+        raise ValueError(f"No existe una orden con id {id_orden}")
+
+    # 2️⃣ Validar que no esté ya cancelada
+    if orden.estado == "Cancelado":
+        raise ValueError(f"La orden {id_orden} ya está cancelada")
+
+    # 3️⃣ Iterar por los detalles y devolver el stock
+    for detalle in orden.detalles_orden:
+        result_inv = db.execute(
+            select(Inventario).where(
+                Inventario.producto_variante_id == detalle.producto_variante_id,
+                Inventario.sucursal_id == orden.sucursal_id
+            )
+        )
+        inventario = result_inv.scalars().first()
+
+        if inventario:
+            inventario.cantidad += detalle.cantidad  # devolvemos stock
+            db.add(inventario)
+
+    # 4️⃣ Actualizar estado de la orden
+    orden.estado = "Cancelado"
+    db.add(orden)
+
+    # 5️⃣ Guardar cambios
+    db.commit()
+    db.refresh(orden)
+
+    return {
+        "message": f"Orden {orden.id} cancelada con éxito",
+        "orden_id": orden.id,
+        "estado": orden.estado
+    }

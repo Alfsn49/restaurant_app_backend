@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.cliente import ClienteCreate, ClienteOut, ClienteUpdate
@@ -8,14 +9,14 @@ router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
 
 @router.get("/get-clientes", response_model=list[ClienteOut])
-async def list_clientes(db: AsyncSession = Depends(get_db)):
-    clientes = await get_clients(db)
+def list_clientes(db: Session = Depends(get_db)):
+    clientes = get_clients(db)
 
-    return await clientes
+    return clientes
 
 @router.get("/get-cliente/{dni}", response_model=ClienteOut)
-async def get_cliente_dni(dni:str, db: AsyncSession = Depends(get_db)):
-    cliente = await get_cliente_by_DNI(db, dni)
+def get_cliente_dni(dni:str, db: Session = Depends(get_db)):
+    cliente = get_cliente_by_DNI(db, dni)
 
     if not cliente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encuentra un cliente")
@@ -23,9 +24,9 @@ async def get_cliente_dni(dni:str, db: AsyncSession = Depends(get_db)):
     return cliente
 
 @router.post("/create-cliente", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
-async def create_clientes(cliente_data:ClienteCreate, db: AsyncSession = Depends(get_db)):
+def create_clientes(cliente_data:ClienteCreate, db: Session = Depends(get_db)):
     try:
-        cliente = await create_Cliente(db, cliente_data)
+        cliente = create_Cliente(db, cliente_data)
         return cliente
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
@@ -36,9 +37,9 @@ async def create_clientes(cliente_data:ClienteCreate, db: AsyncSession = Depends
     
 
 @router.patch("/update-cliente/{cliente_id}", response_model=ClienteOut)
-async def update_clientes(cliente_id:str, cliente_data:ClienteUpdate, db: AsyncSession = Depends(get_db)):
+def update_clientes(cliente_id:str, cliente_data:ClienteUpdate, db: Session = Depends(get_db)):
     try:
-        cliente_actualizado = await update_cliente(db, cliente_id, cliente_data)
+        cliente_actualizado = update_cliente(db, cliente_id, cliente_data)
         return cliente_actualizado
     except HTTPException:
         # Se relanza para que FastAPI maneje la respuesta HTTP
@@ -49,10 +50,12 @@ async def update_clientes(cliente_id:str, cliente_data:ClienteUpdate, db: AsyncS
 
 
 @router.delete("/delete_cliente/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_cliente(cliente_id:str,sucursal_id: str = Query(..., description="ID de la sucursal"), db: AsyncSession= Depends(get_db)):
-    deleted = await soft_delete_cliente(db, cliente_id)
+def delete_cliente(cliente_id:str,sucursal_id: str = Query(..., description="ID de la sucursal"), db: AsyncSession= Depends(get_db)):
+    deleted = soft_delete_cliente(db, cliente_id)
 
     if not deleted:
         raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado o ya eliminado")
     
-    return
+    return {
+        "message":"Usuario Eliminado"
+    }

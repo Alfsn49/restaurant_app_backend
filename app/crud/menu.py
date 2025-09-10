@@ -1,17 +1,16 @@
 from sqlalchemy import and_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.menu import Menu
 from app.models.sucursal import Sucursal
 from app.schemas.menu import MenuCreate, MenuOut, MenuUpdate
 
 
-async def create_menu(db: AsyncSession, menu_data: MenuCreate):
+def create_menu(db: Session, menu_data: MenuCreate):
     # Verificar duplicado por sucursal + nombre + horario
-    result = await db.execute(
-        select(Menu).options(selectinload(Menu.sucursal)) .where(
+    result = db.execute(
+        select(Menu).options(selectinload(Menu.sucursal)).where(
             and_(
                 Menu.name == menu_data.name,
                 Menu.sucursal_id == menu_data.sucursal_id,
@@ -29,52 +28,55 @@ async def create_menu(db: AsyncSession, menu_data: MenuCreate):
     db.add(new_menu)
 
     try:
-        await db.commit()
-        await db.refresh(new_menu)
+        db.commit()
+        db.refresh(new_menu)
     except IntegrityError:
-        await db.rollback()
+        db.rollback()
         return None
 
     return new_menu
 
 
-async def get_menus_by_sucursal(db:AsyncSession, sucursal_id:str):
-    result = await db.execute(select(Menu).where(Menu.sucursal_id == sucursal_id))
+def get_menus_by_sucursal(db: Session, sucursal_id: str):
+    result = db.execute(select(Menu).where(Menu.sucursal_id == sucursal_id))
     return result.scalars().all()
 
-async def get_menu_by_id(db: AsyncSession, menu_id: str):
-    result = await db.execute(
+
+def get_menu_by_id(db: Session, menu_id: str):
+    result = db.execute(
         select(Menu).options(selectinload(Menu.sucursal)).where(Menu.id == menu_id, Menu.is_active == True)
     )
     return result.scalars().one_or_none()
 
 
-async def get_menus(db: AsyncSession):
-    result = await db.execute(select(Menu).options(selectinload(Menu.sucursal).selectinload(Sucursal.local) ).where(Menu.is_active == True))
+def get_menus(db: Session):
+    result = db.execute(
+        select(Menu).options(selectinload(Menu.sucursal).selectinload(Sucursal.local)).where(Menu.is_active == True)
+    )
     return result.scalars().all()
 
 
-async def update_menu(db: AsyncSession, menu_data: MenuUpdate, menu_id: str):
-    menu = await get_menu_by_id(db, menu_id)
+def update_menu(db: Session, menu_data: MenuUpdate, menu_id: str):
+    menu = get_menu_by_id(db, menu_id)
 
     if not menu:
         return None
-    
+
     for key, value in menu_data.model_dump(exclude_unset=True).items():
         setattr(menu, key, value)
-    
-    await db.commit()
-    await db.refresh(menu)
+
+    db.commit()
+    db.refresh(menu)
     return menu
 
 
-async def soft_delete_menu(db: AsyncSession, menu_id: str):
-    result = await db.execute(select(Menu).where(Menu.id == menu_id))
+def soft_delete_menu(db: Session, menu_id: str):
+    result = db.execute(select(Menu).where(Menu.id == menu_id))
     menu = result.scalars().one_or_none()
 
     if not menu:
         return None
-    
+
     menu.is_active = False
-    await db.commit()
+    db.commit()
     return True

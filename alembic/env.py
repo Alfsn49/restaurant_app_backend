@@ -4,7 +4,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from app.core.database_sync import BaseSync
+from app.core.database import Base  # <- este Base es el correcto
 from app.core.config import settings  # <- tu clase Settings que lee .env
 from app.models import user, rol, categoria, cliente, detalle_factura, factura, factura_saas, inventario, local, menu, plan, sucursal, suscripcion, zona, producto_variante, product, orden  # importa los modelos
 
@@ -25,7 +25,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = BaseSync.metadata
+target_metadata = Base.metadata
 
 
 # other values from the config, defined by the needs of env.py,

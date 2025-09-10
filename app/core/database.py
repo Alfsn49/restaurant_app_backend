@@ -1,17 +1,38 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
+import ssl
 
-# Quitar sslmode de la URL para asyncpg
-url = settings.DATABASE_URL.replace("?sslmode=require&channel_binding=require", "")
+# Configuración SSL para conexiones seguras
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
-engine = create_async_engine(url, echo=True,
-                             connect_args={"ssl": True}  
-                             )
-SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+# Para Neon, usa el formato estándar de SQLAlchemy
+engine = create_engine(
+    settings.DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://'),
+    echo=True,  # Para ver las queries en consola
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,
+    connect_args={
+        "sslmode": "require",
+        "sslrootcert": ssl_context
+    }
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
 Base = declarative_base()
 
-
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

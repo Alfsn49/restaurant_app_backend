@@ -1,63 +1,76 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session  # Cambiado de AsyncSession a Session
 from app.schemas.local import LocalCreate, LocalUpdate, LocalOut
-from app.core.database import SessionLocal
-from app.crud.local import create_local, get_locals, get_local_by_name, get_local_by_id, soft_delete_local
 from app.core.database import get_db
+from app.crud.local import create_local, get_locals, get_local_by_name, get_local_by_id, soft_delete_local, update_local  # Añadido update_local al import
 
 router = APIRouter(prefix="/locals", tags=["Locals"])
 
 @router.get("/get-locals", response_model=list[LocalOut])
-async def list_locals(db: AsyncSession = Depends(get_db)):
-    locals = await get_locals(db)
-
-    return await get_locals(db)
+def list_locals(db: Session = Depends(get_db)):  # Quitado async, cambiado a Session
+    locals = get_locals(db)  # Quitado await
+    return locals  # Corregido: retornar la variable ya obtenida
 
 @router.post("/create-local", response_model=LocalOut, status_code=status.HTTP_201_CREATED)
-async def create_new_local(name: str = Form(...),ruc: str = Form(...), direccion: str = Form(...), telefono: str = Form(...), image: UploadFile = File(None), db: AsyncSession = Depends(get_db)):
+async def create_new_local(
+    name: str = Form(...),
+    ruc: str = Form(...),
+    direccion: str = Form(...),
+    telefono: str = Form(...),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db)  # Quitado async, cambiado a Session
+):
     try:
         # Leer la imagen solo si existe
-        image_bytes = await image.read() if image else None
+        image_bytes = await image.read() if image else None  # Quitado await
+        
 
-        existing_local = await get_local_by_name(db, name)
+        existing_local = get_local_by_name(db, name)  # Quitado await
 
         if existing_local:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El local ya existe")
         
-        return await create_local(db=db, name=name, ruc=ruc, direccion=direccion, telefono=telefono, image_file=image_bytes)
+        return create_local(db=db, name=name, ruc=ruc, direccion=direccion, telefono=telefono, image_file=image_bytes)  # Quitado await
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating sucursal: {str(e)}"
+            detail=f"Error creating local: {str(e)}"  # Corregido el mensaje de error
         )
     
 @router.get("/get-local/{local_id}", response_model=LocalOut)
-async def get_local(local_id:str, db: AsyncSession = Depends(get_db)):
-    local = await get_local_by_id(db, local_id)
+def get_local(local_id: str, db: Session = Depends(get_db)):  # Quitado async, cambiado a Session
+    local = get_local_by_id(db, local_id)  # Quitado await
 
     if not local:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-        detail="Local not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Local not found"
+        )
     
     return local
 
-
 @router.patch("/update-local/{local_id}", response_model=LocalOut)
-async def update_local(local_id:str, local_data: LocalUpdate, db: AsyncSession = Depends(get_db)):
-    local = await update_local( local_id, local_data,db)
+def update_local_route(local_id: str, local_data: LocalUpdate, db: Session = Depends(get_db)):  # Quitado async, cambiado a Session
+    local = update_local(local_id, local_data, db)  # Quitado await y corregido el orden de parámetros
     if not local:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="No se encuentra el local")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encuentra el local"
+        )
     
     return local
 
 @router.delete("/delete-local/{local_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_local(local_id: str, db: AsyncSession = Depends(get_db)):
-    deleted = await soft_delete_local(db, local_id)
+def delete_local(local_id: str, db: Session = Depends(get_db)):  # Quitado async, cambiado a Session
+    deleted = soft_delete_local(db, local_id)  # Quitado await
 
     if not deleted:
-        raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail="Local no encontrado o ya eliminado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Local no encontrado o ya eliminado"
+        )
     
-    return 
+    return  # Para status 204 NO CONTENT

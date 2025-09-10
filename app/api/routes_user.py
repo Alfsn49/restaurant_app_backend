@@ -1,29 +1,38 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Form, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session  # Cambiado de AsyncSession a Session
 from typing import List
 from app.schemas.user import UserCreate, UserLogin, UserOut, UserUpdate
-from app.core.database import SessionLocal
-from app.crud.user import create_user, get_user_by_username, get_profile,get_user_by_id, list_users, update_user, soft_delete_user
+from app.core.database import SessionLocal, get_db  # Importamos get_db sincrónico
+from app.crud.user import create_user, get_user_by_username, get_profile, get_user_by_id, list_users, update_user, soft_delete_user
 from app.utils.auth import verify_password, create_access_token, get_current_user, create_refresh_token, validate_refresh_token, role_required
 from jose import jwt, JWTError
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
-
 @router.post("/register", response_model=dict)
-async def register( username:str = Form(...), password:str = Form(...), email:str = Form(...), image:UploadFile = File(None), name:str = Form(...), last_name:str = Form(...), sucursal_id:str= Form(...), rol_id:int = Form(...) ,db: AsyncSession = Depends(get_db)):
+async def register(
+    username: str = Form(...),
+    password: str = Form(...),
+    email: str = Form(...),
+    image: UploadFile = File(None),
+    name: str = Form(...),
+    last_name: str = Form(...),
+    sucursal_id: str = Form(...),
+    rol_id: int = Form(...),
+    db: Session = Depends(get_db)  # Cambiado a Session
+):
     try:
+        image_bytes = await image.read() if image else None  # Quitado await
 
-        image_bytes= await image.read() if image else None
-
-        db_user = await get_user_by_username(db, username)
+        db_user = get_user_by_username(db, username)  # Quitado await
         if db_user:
             raise HTTPException(status_code=400, detail="Username already registered")
         
-        new_user = await create_user(db, username = username, password= password, email= email, name = name, last_name=last_name, rol_id=rol_id, sucursal_id=sucursal_id, image_file=image_bytes)
+        new_user = create_user(  # Quitado await
+            db, username=username, password=password, email=email,
+            name=name, last_name=last_name, rol_id=rol_id,
+            sucursal_id=sucursal_id, image_file=image_bytes
+        )
         
         return {"message": "Usuario registrado exitosamente", "id": new_user.id}
     
@@ -34,9 +43,10 @@ async def register( username:str = Form(...), password:str = Form(...), email:st
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al crear el usuario: {str(e)}"
         )
+
 @router.post("/login")
-async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
-    db_user = await get_user_by_username(db, user.username)
+def login(user: UserLogin, db: Session = Depends(get_db)):  # Cambiado a Session
+    db_user = get_user_by_username(db, user.username)  # Quitado await
     if not db_user or not verify_password(user.password, db_user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
 
@@ -48,19 +58,19 @@ async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
         "last_name": db_user.last_name,
         "image": db_user.image,
         "is_active": db_user.is_active,
-        "sucursal":{
-            "id":db_user.sucursal_id,
-            "nombre":db_user.sucursal.nombre
+        "sucursal": {
+            "id": db_user.sucursal_id,
+            "nombre": db_user.sucursal.nombre
         },
-        "local":{
-            "id":db_user.sucursal.local.id,
+        "local": {
+            "id": db_user.sucursal.local.id,
             "nombre": db_user.sucursal.local.name
         },
-        "rol":{
-            "id":db_user.rol_id,
-            "nombre":db_user.rol.name
+        "rol": {
+            "id": db_user.rol_id,
+            "nombre": db_user.rol.name
         }
-        })
+    })
     refresh_token = create_refresh_token({"sub": db_user.id})
 
     return {
@@ -70,14 +80,14 @@ async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
     }
 
 @router.post("/refresh-token")
-async def refresh_token(payload: dict = Depends(validate_refresh_token), db: AsyncSession = Depends(get_db)):
+def refresh_token(payload: dict = Depends(validate_refresh_token), db: Session = Depends(get_db)):  # Cambiado a Session
     id = payload.get("sub")
-    print("Id del usaurio", id)
+    print("Id del usuario", id)
     if not id:
         raise HTTPException(status_code=401, detail="Token inválido")
 
     # Traer usuario actualizado desde DB
-    db_user = await get_user_by_id(db, id)
+    db_user = get_user_by_id(db, id)  # Quitado await
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
@@ -88,30 +98,29 @@ async def refresh_token(payload: dict = Depends(validate_refresh_token), db: Asy
         "email": db_user.email,
         "name": db_user.name,
         "last_name": db_user.last_name,
-        "sucursal":{
-            "id":db_user.sucursal_id,
-            "nombre":db_user.sucursal.nombre
+        "sucursal": {
+            "id": db_user.sucursal_id,
+            "nombre": db_user.sucursal.nombre
         },
-        "local":{
-            "id":db_user.sucursal.local.id,
+        "local": {
+            "id": db_user.sucursal.local.id,
             "nombre": db_user.sucursal.local.name
         },
-        "rol":{
-            "id":db_user.rol_id,
-            "nombre":db_user.rol.name
+        "rol": {
+            "id": db_user.rol_id,
+            "nombre": db_user.rol.name
         }
     })
 
     return {"access_token": new_access_token, "token_type": "bearer"}
 
-
 @router.get("/list/{sucursal_id}", response_model=List[dict])
-async def get_users(
+def get_users(
     sucursal_id: str,
-    current_user: dict = Depends(role_required("Administrador","Dueño")),
-    db: AsyncSession = Depends(get_db)
+    current_user: dict = Depends(role_required("Administrador", "Dueño")),
+    db: Session = Depends(get_db)  # Cambiado a Session
 ):
-    users = await list_users(sucursal_id, db)
+    users = list_users(sucursal_id, db)  # Quitado await
     return [
         {
             "id": u.id,
@@ -128,13 +137,23 @@ async def get_users(
     ]
 
 @router.patch("/update/{user_id}")
-async def update_user_route(user_id: str, username:str = Form(...), email:str = Form(...), image:UploadFile = File(None), image_url: str = Form(None), name:str = Form(...), last_name:str = Form(...), sucursal_id:str= Form(...), rol_id:int = Form(...) ,current_user: dict = Depends(role_required("Administrador", "Dueño")), db: AsyncSession = Depends(get_db)):
-
+async def update_user_route(
+    user_id: str,
+    username: str = Form(...),
+    email: str = Form(...),
+    image: UploadFile = File(None),
+    image_url: str = Form(None),
+    name: str = Form(...),
+    last_name: str = Form(...),
+    sucursal_id: str = Form(...),
+    rol_id: int = Form(...),
+    current_user: dict = Depends(role_required("Administrador", "Dueño")),
+    db: Session = Depends(get_db)  # Cambiado a Session
+):
     try:
+        image_bytes = await image.read() if image else None  # Quitado await
 
-        image_bytes = await image.read() if image else None
-
-        user = await update_user(
+        user = update_user(  # Quitado await
             db=db,
             user_id=user_id,
             username=username,
@@ -149,8 +168,8 @@ async def update_user_route(user_id: str, username:str = Form(...), email:str = 
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
         
-        return{
-            "message" : "Usuario actualizado exitosamente"
+        return {
+            "message": "Usuario actualizado exitosamente"
         }
     except HTTPException:
         raise
@@ -160,24 +179,30 @@ async def update_user_route(user_id: str, username:str = Form(...), email:str = 
             detail=f"Error al actualizar el usuario: {str(e)}"
         )
 
-    
-
 @router.delete("/delete/{user_id}")
-async def delete_user_route(user_id: str, current_user: dict = Depends(role_required("Administrador", "Dueño")), db: AsyncSession = Depends(get_db)):
-    user = await soft_delete_user(db, user_id)
+def delete_user_route(
+    user_id: str,
+    current_user: dict = Depends(role_required("Administrador", "Dueño")),
+    db: Session = Depends(get_db)  # Cambiado a Session
+):
+    user = soft_delete_user(db, user_id)  # Quitado await
 
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
     
-    return{
-        "message" : "Usuario eliminado exitosamente"
+    return {
+        "message": "Usuario eliminado exitosamente"
     }
 
 @router.get("/profile/{user_id}", response_model=UserOut)
-async def get_user_profile(user_id: str, current_user: dict = Depends(role_required("Administrador", "Dueño")), db: AsyncSession = Depends(get_db)):
+def get_user_profile(
+    user_id: str,
+    current_user: dict = Depends(role_required("Administrador", "Dueño")),
+    db: Session = Depends(get_db)  # Cambiado a Session
+):
     if current_user["rol"]["nombre"] != "Administrador":
         raise HTTPException(status_code=403, detail="No tienes permiso")
-    existing_user = await get_profile(db, user_id)
+    existing_user = get_profile(db, user_id)  # Quitado await
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
     return existing_user
