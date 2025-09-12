@@ -10,7 +10,7 @@ from datetime import datetime
 router = APIRouter(prefix="/ordenes", tags=["Órdenes"])
 
 @router.post("/create", response_model=dict)
-def crear_orden_endpoint(orden: OrdenCreate, current_user: dict = Depends(role_required("Administrador", "Dueño")),db: Session = Depends(get_db)):
+def crear_orden_endpoint(orden: OrdenCreate, current_user: dict = Depends(role_required("Administrador", "Dueño", "Cajero")),db: Session = Depends(get_db)):
     print(orden)
     nueva_orden = crear_orden(db, orden.dict())
     return {
@@ -24,7 +24,7 @@ def crear_orden_endpoint(orden: OrdenCreate, current_user: dict = Depends(role_r
 @router.get("/list")
 def listar_ordenes_endpoint(id_sucursal:str,
     fecha_inicio: datetime,
-    fecha_fin: datetime, current_user: dict = Depends(role_required("Administrador", "Dueño")),db: Session = Depends(get_db)):
+    fecha_fin: datetime, current_user: dict = Depends(role_required("Administrador", "Dueño", "Cajero")),db: Session = Depends(get_db)):
     print('Fecha de inicio', fecha_inicio)
     print('Fecha de fin', fecha_fin)
     ordenes = list_ordenes(id_sucursal, fecha_inicio, fecha_fin, db)

@@ -206,3 +206,70 @@ def get_user_profile(
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
     return existing_user
+
+@router.patch("/profile/edit")
+async def update_profile(
+    username: str = Form(None),
+    email: str = Form(None),
+    image: UploadFile = File(None),
+    image_url: str = Form(None),
+    name: str = Form(None),
+    last_name: str = Form(None),
+    sucursal_id: str = Form(None),
+    rol_id: int = Form(None),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    try:
+        
+        image_bytes = await image.read() if image else None
+
+        user = update_user(
+            db=db,
+            user_id=current_user["sub"],
+            username=username,
+            email=email,
+            name=name,
+            last_name=last_name,
+            sucursal_id=sucursal_id,
+            rol_id=rol_id,
+            image_file=image_bytes,
+            image_url=image_url
+        )
+
+        if not user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no encontrado")
+
+        new_access_token = create_access_token({
+            "sub": user.id,
+            "username": user.username,
+            "email": user.email,
+            "name": user.name,
+            "last_name": user.last_name,
+            "image": user.image,
+            "is_active":user.is_active,
+            "sucursal": {
+                "id": user.sucursal_id,
+                "nombre": user.sucursal.nombre
+            },
+            "local": {
+                "id": user.sucursal.local.id,
+                "nombre": user.sucursal.local.name
+            },
+            "rol": {
+                "id": user.rol_id,
+                "nombre": user.rol.name
+            }
+        })
+
+        return {
+            "message": "Perfil actualizado exitosamente",
+            "access_token": new_access_token
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar el perfil: {str(e)}"
+        )

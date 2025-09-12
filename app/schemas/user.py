@@ -28,6 +28,7 @@ class UserOut (BaseModel):
     email: str | None = None
     name: str
     last_name: str
+    image: str
     sucursal_id: str
     sucursal: Optional[SucursalOut]
     is_active: bool = True

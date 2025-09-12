@@ -1,2 +1,6 @@
 /venv
+# Ignore .env in the root directory
 .env
+
+# Ignore .env files in any subdirectory
+**/.env

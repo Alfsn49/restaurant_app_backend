@@ -79,61 +79,62 @@ def list_users(sucursal_id: str, db: Session):  # Quitado async, cambiado a Sess
     )
     return result.scalars().all()
 
-def update_user(  # Quitado async
-    db: Session,  # Cambiado a Session
+def update_user(
+    db: Session,
     user_id: str,
-    username: str,
-    email: str,
-    name: str,
-    last_name: str,
-    sucursal_id: int,
-    rol_id: int,
+    username: str = None,
+    email: str = None,
+    name: str = None,
+    last_name: str = None,
+    sucursal_id: int = None,
+    rol_id: int = None,
     image_file=None,
     image_url=None
 ):
-    user = get_user_by_id(db, user_id)  # Quitado await
+    user = get_user_by_id(db, user_id)
     if not user:
         return None
 
     new_image_url = None
 
-    # Si viene un archivo nuevo → subir y borrar el anterior
+    # Manejo de imagen
     if image_file:
         try:
-            # 🔥 Eliminar la imagen anterior si existe
             if user.image:
                 try:
                     delete_image_by_url(user.image)
                 except Exception as e:
                     print(f"⚠️ No se pudo borrar la imagen anterior: {str(e)}")
-
-            # ✅ CORRECCIÓN: Usar public_id en lugar de file_name
             new_image_url = upload_image_from_bytes(
                 file_bytes=image_file,
-                public_id=f"users_{username}_{name}",
+                public_id=f"users_{username or user.username}_{name or user.name}",
                 folder="users"
             )
         except Exception as e:
             raise RuntimeError(f"Error uploading image: {str(e)}")
-
-    # Si no vino archivo, pero sí pasó URL explícita → se conserva
     elif image_url:
-        new_image_url = image_url  
+        new_image_url = image_url
 
-    # Actualizar campos
-    user.username = username
-    user.email = email
-    user.name = name
-    user.last_name = last_name
-    user.sucursal_id = sucursal_id
-    user.rol_id = rol_id
-
-    if new_image_url:
+    # Solo actualizar campos que no sean None
+    if username is not None:
+        user.username = username
+    if email is not None:
+        user.email = email
+    if name is not None:
+        user.name = name
+    if last_name is not None:
+        user.last_name = last_name
+    if sucursal_id is not None:
+        user.sucursal_id = sucursal_id
+    if rol_id is not None:
+        user.rol_id = rol_id
+    if new_image_url is not None:
         user.image = new_image_url
 
-    db.commit()  # Quitado await
-    db.refresh(user)  # Quitado await
+    db.commit()
+    db.refresh(user)
     return user
+
 
 def soft_delete_user(db: Session, user_id: str):  # Quitado async, cambiado a Session
     result = db.execute(select(User).where(User.id == user_id))  # Quitado await
