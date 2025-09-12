@@ -14,11 +14,11 @@ import cloudinary.api
 
 load_dotenv()
 
-imagekit = ImageKit(
-    private_key=os.getenv("private_key"),
-    public_key=os.getenv("public_key"),
-    url_endpoint=os.getenv("url_endpoint")
-)
+# imagekit = ImageKit(
+#     private_key=os.getenv("private_key"),
+#     public_key=os.getenv("public_key"),
+#     url_endpoint=os.getenv("url_endpoint")
+# )
 
 # Configurar Cloudinary
 cloudinary.config(
