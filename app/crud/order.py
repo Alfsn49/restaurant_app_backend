@@ -23,7 +23,7 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
     next_order_number = 1 if not last_order else last_order.numero_orden + 1
 
     # 2️⃣ Crear orden
-    orden = Orden(numero_orden=next_order_number, sucursal_id=sucursal_id, estado = "Pagado")
+    orden = Orden(numero_orden=next_order_number, sucursal_id=sucursal_id, estado="Pagado")
     db.add(orden)
     db.flush()
 
@@ -38,7 +38,7 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
         )
         db.add(detalle)
 
-        # 🔹 Reducir inventario
+        # Reducir inventario
         result_inv = db.execute(
             select(Inventario)
             .where(
@@ -47,15 +47,10 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
             )
         )
         inventario = result_inv.scalars().first()
-
         if not inventario:
             raise ValueError(f"No hay inventario registrado para la variante {item['product_variante_id']} en la sucursal {sucursal_id}")
-
         if inventario.cantidad < item["cantidad"]:
-            raise ValueError(
-                f"No hay suficiente stock de la variante {item['product_variante_id']}. Disponible: {inventario.cantidad}, pedido: {item['cantidad']}"
-            )
-
+            raise ValueError(f"No hay suficiente stock de la variante {item['product_variante_id']}. Disponible: {inventario.cantidad}, pedido: {item['cantidad']}")
         inventario.cantidad -= item["cantidad"]
         db.add(inventario)
 
@@ -74,10 +69,8 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
     result = db.execute(
         select(OrdenDetalle)
         .options(
-            selectinload(OrdenDetalle.producto_variantes)
-            .selectinload(Producto_Variante.producto),
-            selectinload(OrdenDetalle.producto_variantes)
-            .selectinload(Producto_Variante.zona)
+            selectinload(OrdenDetalle.producto_variantes).selectinload(Producto_Variante.producto),
+            selectinload(OrdenDetalle.producto_variantes).selectinload(Producto_Variante.zona)
         )
         .where(OrdenDetalle.orden_id == orden.id)
     )
@@ -85,6 +78,7 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
 
     # 6️⃣ Agrupar por zona
     tickets_por_zona = {}
+    total_general = 0
     for detalle in detalles:
         variante = detalle.producto_variantes
         producto = variante.producto
@@ -97,48 +91,56 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
             "precio_unitario": detalle.precio_unitario,
             "subtotal": detalle.subtotal
         })
+        total_general += detalle.subtotal
 
-    # 7️⃣ Generar "texto del ticket" en lugar de escribir en la impresora
     sucursal_nombre = orden.sucursal.nombre if orden.sucursal else "SUCURSAL"
     local_nombre = orden.sucursal.local.name if orden.sucursal and orden.sucursal.local else "LOCAL"
 
-    ticket_lines = []
-    ticket_lines.append(sucursal_nombre)
-    ticket_lines.append(local_nombre)
-    ticket_lines.append(f"TICKET ORDEN #{orden.numero_orden}")
-    ticket_lines.append("="*32)
+    # 7️⃣ Crear tickets separados (uno por zona, el último incluye total)
+    tickets_array = []
+    num_zonas = len(tickets_por_zona)
 
-    total_general = 0
-    for zona_nombre, items in tickets_por_zona.items():
-        ticket_lines.append(f"*** Zona: {zona_nombre} ***")
+    for idx, (zona_nombre, items) in enumerate(tickets_por_zona.items(), 1):
+        lines = []
+
+        # Encabezado solo en la primera zona
+        if idx == 1:
+            lines.append(sucursal_nombre)
+            lines.append(local_nombre)
+            lines.append(f"TICKET ORDEN #{orden.numero_orden}")
+            lines.append("="*32)
+
+        # Zona
+        lines.append(f"*** Zona: {zona_nombre} ***")
         subtotal_zona = 0
         for item in items:
             nombre = item['producto'][:25].ljust(25)
             cantidad = str(item['cantidad']).rjust(2)
             precio = f"{item['precio_unitario']:.2f}".rjust(6)
-            ticket_lines.append(f"{nombre} x{cantidad} ${precio}")
+            lines.append(f"{nombre} x{cantidad} ${precio}")
             subtotal_zona += item['subtotal']
-        ticket_lines.append("-"*32)
-        ticket_lines.append(f"Subtotal zona: ${subtotal_zona:.2f}")
-        total_general += subtotal_zona
 
-    ticket_lines.append("="*32)
-    ticket_lines.append(f"TOTAL: ${total_general:.2f}")
-    ticket_lines.append("="*32)
-    ticket_lines.append("¡Gracias por su pedido!")
-    ticket_lines.append("\n"*3)  # Saltos extra
+        lines.append("-"*32)
+        lines.append(f"Subtotal zona: ${subtotal_zona:.2f}")
 
-    ticket_text = "\n".join(ticket_lines)
+        # ✅ Si es la última zona, agregar total general y mensaje de gracias
+        if idx == num_zonas:
+            lines.append("="*32)
+            lines.append(f"TOTAL: ${total_general:.2f}")
+            lines.append("="*32)
+            lines.append("¡Gracias por su pedido!")
+            lines.append("\n"*3)
 
-    # 8️⃣ Respuesta al frontend
+        tickets_array.append("\n".join(lines))
+
+    
+
     return {
         "message": "Orden creada con éxito",
         "orden_id": orden.id,
         "tickets_por_zona": tickets_por_zona,
-        "ticket_text": ticket_text   # 👈 aquí va el texto completo como lo ibas a imprimir
+        "tickets_array": tickets_array  # ✅ cada ticket separado
     }
-
-
 
 def list_ordenes(id_sucursal:str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
 

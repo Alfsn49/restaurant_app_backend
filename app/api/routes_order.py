@@ -17,7 +17,7 @@ def crear_orden_endpoint(orden: OrdenCreate, current_user: dict = Depends(role_r
         "message": "Orden creada con éxito",
         "orden_id": nueva_orden["orden_id"],  # <- así accedes al id
         "tickets_por_zona": nueva_orden["tickets_por_zona"],
-        "ticket_text":nueva_orden["ticket_text"]
+        "tickets_array": nueva_orden["tickets_array"]
     }
 
 
