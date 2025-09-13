@@ -14,8 +14,8 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
         select(Orden)
         .options(
             selectinload(Orden.detalles_orden)
-            .selectinload(OrdenDetalle.producto_variantes)
-            .selectinload(Producto_Variante.producto),
+                .selectinload(OrdenDetalle.producto_variantes)
+                .selectinload(Producto_Variante.producto),
             selectinload(Orden.sucursal).selectinload(Sucursal.local)
         )
         .where(
@@ -39,9 +39,15 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
         for orden in ordenes
     )
 
+    total_cantidad_productos = sum(
+        sum(detalle.cantidad for detalle in orden.detalles_orden)
+        for orden in ordenes
+    )
+
     # Convertir cada fecha a hora de Ecuador para mostrar
     for orden in ordenes:
-        orden.fecha = orden.fecha.replace(tzinfo=ZoneInfo("UTC")).astimezone(ECUADOR_TZ)
+        if orden.fecha:
+            orden.fecha = orden.fecha.replace(tzinfo=ZoneInfo("UTC")).astimezone(ECUADOR_TZ)
 
     return {
         "sucursal_id": id_sucursal,
@@ -50,6 +56,7 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
         "fecha_inicio": fecha_inicio.date(),
         "fecha_fin": fecha_fin.date(),
         "total_ventas": total_ventas,
+        "total_cantidad_productos": total_cantidad_productos,
         "ordenes": [
             {
                 "id": orden.id,
