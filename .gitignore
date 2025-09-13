@@ -4,3 +4,5 @@
 
 # Ignore .env files in any subdirectory
 **/.env
+
+venv
