@@ -96,21 +96,21 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
     sucursal_nombre = orden.sucursal.nombre if orden.sucursal else "SUCURSAL"
     local_nombre = orden.sucursal.local.name if orden.sucursal and orden.sucursal.local else "LOCAL"
 
-    # 7️⃣ Crear tickets separados (uno por zona, el último incluye total)
+        # 7️⃣ Crear tickets separados (uno por zona, el último incluye total)
     tickets_array = []
     num_zonas = len(tickets_por_zona)
 
     for idx, (zona_nombre, items) in enumerate(tickets_por_zona.items(), 1):
         lines = []
 
-        # Encabezado solo en la primera zona
+        # ✅ Encabezado solo en la primera zona
         if idx == 1:
             lines.append(sucursal_nombre)
             lines.append(local_nombre)
             lines.append(f"TICKET ORDEN #{orden.numero_orden}")
             lines.append("="*32)
 
-        # Zona
+        # ✅ Zona
         lines.append(f"*** Zona: {zona_nombre} ***")
         subtotal_zona = 0
         for item in items:
@@ -123,23 +123,24 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
         lines.append("-"*32)
         lines.append(f"Subtotal zona: ${subtotal_zona:.2f}")
 
-        # Última zona agrega total general y mensaje
+        # ✅ Última zona agrega total general y mensaje
         if idx == num_zonas:
             lines.append("="*32)
             lines.append(f"TOTAL: ${total_general:.2f}")
             lines.append("="*32)
             lines.append("¡Gracias por su pedido!")
 
-        # Unir líneas usando CRLF para compatibilidad Linux/Windows
-        ticket_text = "\r\n".join(lines)
+        # ✅ Unir líneas usando CRLF (\r\n) para compatibilidad Linux/Windows
+        ticket_text = "\r\n".join(lines) + "\r\n"
         tickets_array.append(ticket_text)
 
     return {
         "message": "Orden creada con éxito",
         "orden_id": orden.id,
         "tickets_por_zona": tickets_por_zona,
-        "tickets_array": tickets_array  # ✅ cada ticket separado
+        "tickets_array": tickets_array  # <- cada zona es un ticket
     }
+
 
 def list_ordenes(id_sucursal:str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
 
