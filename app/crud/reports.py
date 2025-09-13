@@ -20,6 +20,7 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
         )
         .where(
             Orden.sucursal_id == id_sucursal,
+            Orden.estado != 'Anulado',  # <-- Excluir órdenes anuladas
             func.date(
                 text("(ordenes.fecha AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil')")
             ) >= fecha_inicio.date(),

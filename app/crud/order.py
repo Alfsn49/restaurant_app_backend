@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func, text
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func
 from app.models.orden import Orden, OrdenDetalle
@@ -9,6 +9,9 @@ from app.models.sucursal import Sucursal
 from app.models.inventario import Inventario
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+ECUADOR_TZ = ZoneInfo("America/Guayaquil")
 
 def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
     sucursal_id = orden_data["sucursal_id"]
@@ -142,12 +145,38 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
     }
 
 
-def list_ordenes(id_sucursal:str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
+def list_ordenes(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
+    """
+    Retorna todas las órdenes de una sucursal entre dos fechas, considerando la zona horaria de Ecuador.
+    """
 
-    result =  db.execute(select(Orden).options(selectinload(Orden.detalles_orden)).where(Orden.sucursal_id == id_sucursal, 
-    func.date(Orden.fecha) >= fecha_inicio.date(), func.date(Orden.fecha) <= fecha_fin.date()).order_by((Orden.fecha.desc())))
+    query = (
+        select(Orden)
+        .options(selectinload(Orden.detalles_orden)
+                 .selectinload(OrdenDetalle.producto_variantes)
+                 .selectinload(Producto_Variante.producto),
+                 selectinload(Orden.sucursal).selectinload(Sucursal.local))
+        .where(
+            Orden.sucursal_id == id_sucursal,
+            func.date(
+                text("(ordenes.fecha AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil')")
+            ) >= fecha_inicio.date(),
+            func.date(
+                text("(ordenes.fecha AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil')")
+            ) <= fecha_fin.date()
+        )
+        .order_by(Orden.fecha.desc())
+    )
 
-    return result.scalars().all()
+    result = db.execute(query)
+    ordenes = result.scalars().all()
+
+    # Convertir la fecha de cada orden a hora de Ecuador
+    for orden in ordenes:
+        if orden.fecha:
+            orden.fecha = orden.fecha.replace(tzinfo=ZoneInfo("UTC")).astimezone(ECUADOR_TZ)
+
+    return ordenes
 
 
 def cancelar_orden(id_orden: str, db: Session):
