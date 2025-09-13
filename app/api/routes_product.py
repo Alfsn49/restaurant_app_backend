@@ -43,7 +43,7 @@ def list_products_endpoint(
                 resultado.append({
                     "producto_id": producto.id,
                     "product_variante_id": variante.id,
-                    "nombre": f"{producto.nombre} de {variante.nombre}" if variante.nombre else producto.nombre,
+                    "nombre": f"{variante.nombre}" if variante.nombre else producto.nombre,
                     "precio": variante.precio,
                     "disponible": variante.disponible,
                     "cantidad": cantidad_actual,
