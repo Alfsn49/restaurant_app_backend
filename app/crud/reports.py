@@ -1,14 +1,15 @@
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from app.models.orden import Orden, OrdenDetalle
 from app.models.producto_variante import Producto_Variante
-from app.models.product import Product
 from app.models.sucursal import Sucursal
-
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
+ECUADOR_TZ = ZoneInfo("America/Guayaquil")
 
 def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime, db: Session):
+    # Filtrar por la fecha de Ecuador en la DB
     query = (
         select(Orden)
         .options(
@@ -19,8 +20,12 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
         )
         .where(
             Orden.sucursal_id == id_sucursal,
-            func.date(Orden.fecha) >= fecha_inicio.date(),
-            func.date(Orden.fecha) <= fecha_fin.date()
+            func.date(
+                text("(ordenes.fecha AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil')")
+            ) >= fecha_inicio.date(),
+            func.date(
+                text("(ordenes.fecha AT TIME ZONE 'UTC' AT TIME ZONE 'America/Guayaquil')")
+            ) <= fecha_fin.date()
         )
         .order_by(Orden.fecha.desc())
     )
@@ -33,6 +38,10 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
         for orden in ordenes
     )
 
+    # Convertir cada fecha a hora de Ecuador para mostrar
+    for orden in ordenes:
+        orden.fecha = orden.fecha.replace(tzinfo=ZoneInfo("UTC")).astimezone(ECUADOR_TZ)
+
     return {
         "sucursal_id": id_sucursal,
         "sucursal_nombre": ordenes[0].sucursal.nombre if ordenes else None,
@@ -44,7 +53,7 @@ def reporte_ventas(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime
             {
                 "id": orden.id,
                 "numero_orden": orden.numero_orden,
-                "fecha": orden.fecha,
+                "fecha": orden.fecha.strftime("%Y-%m-%d %H:%M:%S"),
                 "detalles": [
                     {
                         "producto": f"{d.producto_variantes.producto.nombre} - {d.producto_variantes.nombre}",

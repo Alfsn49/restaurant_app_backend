@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.models.product import Product
 from app.models.producto_variante import Producto_Variante
 from app.models.sucursal import Sucursal
@@ -67,9 +67,16 @@ def list_products_sucursal(db: Session, sucursal_id: str):
 
 
 def list_products_menu(db: Session, sucursal_id: str):
-    print("Sucursal", sucursal_id)
+    # Subconsulta: precio mínimo de cada producto
+    precio_min = (
+        select(Producto_Variante.producto_id, func.min(Producto_Variante.precio).label("precio"))
+        .group_by(Producto_Variante.producto_id)
+        .subquery()
+    )
+
     result = db.execute(
         select(Product)
+        .join(precio_min, precio_min.c.producto_id == Product.id)
         .options(
             selectinload(Product.categoria),
             selectinload(Product.variantes).selectinload(Producto_Variante.inventario),
@@ -78,6 +85,7 @@ def list_products_menu(db: Session, sucursal_id: str):
                 .selectinload(Sucursal.local)
         )
         .where(Product.sucursal_id == sucursal_id)
+        .order_by(precio_min.c.precio.asc())  # 🔑 ordena por el precio mínimo del producto
     )
     return result.scalars().all()
 

@@ -83,7 +83,7 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
         variante = detalle.producto_variantes
         producto = variante.producto
         zona = variante.zona
-        nombre_completo = f"{producto.nombre} - {variante.nombre}" if producto else variante.nombre
+        nombre_completo = f"{variante.nombre}" if producto else variante.nombre
         zona_nombre = zona.name if zona else "Sin zona"
         tickets_por_zona.setdefault(zona_nombre, []).append({
             "producto": nombre_completo,
@@ -117,23 +117,22 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
             nombre = item['producto'][:25].ljust(25)
             cantidad = str(item['cantidad']).rjust(2)
             precio = f"{item['precio_unitario']:.2f}".rjust(6)
-            lines.append(f"{nombre} x{cantidad} ${precio}")
+            lines.append(f"{nombre} Cant: {cantidad} ${precio}")
             subtotal_zona += item['subtotal']
 
         lines.append("-"*32)
         lines.append(f"Subtotal zona: ${subtotal_zona:.2f}")
 
-        # ✅ Si es la última zona, agregar total general y mensaje de gracias
+        # Última zona agrega total general y mensaje
         if idx == num_zonas:
             lines.append("="*32)
             lines.append(f"TOTAL: ${total_general:.2f}")
             lines.append("="*32)
             lines.append("¡Gracias por su pedido!")
-            lines.append("\n"*3)
 
-        tickets_array.append("\n".join(lines))
-
-    
+        # Unir líneas usando CRLF para compatibilidad Linux/Windows
+        ticket_text = "\r\n".join(lines)
+        tickets_array.append(ticket_text)
 
     return {
         "message": "Orden creada con éxito",
