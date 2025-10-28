@@ -135,11 +135,19 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
             ANCHO_LINEA = 20  # puedes aumentar o reducir este número según tu impresora
 
             # 🔹 Espacios reservados para cantidad y total
-            reservado = len(cantidad) + len(subtotal) + 4  # margen adicional visual
+            reservado = len(cantidad) + len(subtotal) + 8  # margen adicional visual
 
-            # 🔹 Solo separar cantidad y subtotal, sin tocar el nombre
-            espacios_entre_cant_y_total = " " * 5  # ajusta para que no queden pegados
-            linea = f"{nombre}  {cantidad}{espacios_entre_cant_y_total}{subtotal}"
+            # 🔹 Espacio disponible para el nombre del producto
+            espacio_disponible = ANCHO_LINEA - reservado
+            if len(nombre) > espacio_disponible:
+                nombre = nombre[:espacio_disponible]
+
+            # 🔹 Calcular espacios entre nombre, cantidad y total
+            espacios_entre_nombre_y_cant = " " * 6  # ajusta este valor para separar más el "cant:"
+            espacios_entre_cant_y_total = " " * (ANCHO_LINEA - len(nombre) - len(espacios_entre_nombre_y_cant) - len(cantidad) - len(subtotal))
+
+            # 🔹 Construir línea final con gran separación visual
+            linea = f"{nombre}{espacios_entre_nombre_y_cant}{cantidad}{espacios_entre_cant_y_total}{subtotal}"
             lines.append(linea)
 
             subtotal_zona += item["subtotal"]
