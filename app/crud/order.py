@@ -120,59 +120,82 @@ def crear_orden(db: Session, orden_data: dict, imprimir_local=True):
             lines.append(f"TICKET ORDEN #{orden.numero_orden}")
             lines.append("=" * 32)
 
-        # ✅ Zona (con fecha y hora en la siguiente línea)
+        # ✅ Zona y fecha
         lines.append(f"*** {zona_nombre} ***")
         lines.append(fecha_actual)
 
-
         subtotal_zona = 0
+
+        # 🔹 Definir anchos
+        ANCHO_LINEA = 32      # total de caracteres de la línea
+        ANCHO_CANTIDAD = 3    # cantidad ocupa 3 caracteres
+        ANCHO_SUBTOTAL = 7    # subtotal ocupa 7 caracteres (ej: $12.50)
+        ESPACIOS_SEPARACION = 2  # espacios entre columnas
+
         for item in items:
             nombre = item["producto"]
-            cantidad = f"{item['cantidad']}"
-            subtotal = f"${item['subtotal']:.2f}"
+            cantidad = str(item["cantidad"])
+            subtotal = f"{item['subtotal']:.2f}"
 
-            # 🔹 Ancho total del ticket
-            ANCHO_LINEA = 20  # puedes aumentar o reducir este número según tu impresora
+            # Cortar nombre si es demasiado largo
+            ancho_nombre = ANCHO_LINEA - ANCHO_CANTIDAD - ANCHO_SUBTOTAL - ESPACIOS_SEPARACION
+            nombre_corto = nombre[:ancho_nombre]
 
-            # 🔹 Espacios reservados para cantidad y total
-            reservado = len(cantidad) + len(subtotal) + 8  # margen adicional visual
-
-            # 🔹 Espacio disponible para el nombre del producto
-            espacio_disponible = ANCHO_LINEA - reservado
-            if len(nombre) > espacio_disponible:
-                nombre = nombre[:espacio_disponible]
-
-            # 🔹 Calcular espacios entre nombre, cantidad y total
-            espacios_entre_nombre_y_cant = " " * 6  # ajusta este valor para separar más el "cant:"
-            espacios_entre_cant_y_total = " " * (ANCHO_LINEA - len(nombre) - len(espacios_entre_nombre_y_cant) - len(cantidad) - len(subtotal))
-
-            # 🔹 Construir línea final con gran separación visual
-            linea = f"{nombre}{espacios_entre_nombre_y_cant}{cantidad}{espacios_entre_cant_y_total}{subtotal}"
+            # Construir línea con padding
+            linea = (
+                nombre_corto.ljust(ancho_nombre) + " " * ESPACIOS_SEPARACION +
+                cantidad.rjust(ANCHO_CANTIDAD) + " " * ESPACIOS_SEPARACION +
+                "$" + subtotal.rjust(ANCHO_SUBTOTAL - 1)  # -1 porque ya pusimos $
+            )
             lines.append(linea)
 
             subtotal_zona += item["subtotal"]
 
-
-        lines.append("-" * 32)
-        lines.append(f"Subtotal zona: ${subtotal_zona:.2f}")
+        lines.append("-" * ANCHO_LINEA)
+        lines.append(f"Subtotal zona: ${subtotal_zona:.2f}".rjust(ANCHO_LINEA))
 
         # ✅ Última zona agrega total general y mensaje
         if idx == num_zonas:
-            lines.append("=" * 32)
-            lines.append(f"TOTAL: ${total_general:.2f}")
-            lines.append("=" * 32)
-            lines.append("¡Gracias por su pedido!")
+            lines.append("=" * ANCHO_LINEA)
+            lines.append(f"TOTAL: ${total_general:.2f}".rjust(ANCHO_LINEA))
+            lines.append("=" * ANCHO_LINEA)
+            lines.append("¡Gracias por su pedido!".center(ANCHO_LINEA))
 
         # ✅ Unir líneas usando CRLF (\r\n)
         ticket_text = "\r\n".join(lines) + "\r\n"
         tickets_array.append(ticket_text)
+    
+    # 8️⃣ Crear JSON con toda la info
+    fecha_iso = datetime.now(ECUADOR_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+    zonas_json = []
+    for zona_nombre, items in tickets_por_zona.items():
+        subtotal_zona = sum(item["subtotal"] for item in items)
+        zonas_json.append({
+            "zona": zona_nombre,
+            "items": items,
+            "subtotal": subtotal_zona
+        })
+
+    orden_json = {
+        "orden_id": orden.id,
+        "numero_orden": orden.numero_orden,
+        "sucursal": sucursal_nombre,
+        "local": local_nombre,
+        "fecha": fecha_iso,
+        "total": total_general,
+        "zonas": zonas_json
+    }
 
     return {
         "message": "Orden creada con éxito",
         "orden_id": orden.id,
         "tickets_por_zona": tickets_por_zona,
-        "tickets_array": tickets_array
+        "tickets_array": tickets_array,
+        "orden_json": orden_json           # Para frontend / API
     }
+
+#Version json de facturas:
 
 
 # Versión para el desarrollo de la facturación electronica
