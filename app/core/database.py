@@ -16,11 +16,23 @@ engine = create_engine(
     max_overflow=10,
     pool_timeout=30,
     pool_recycle=1800,
+    pool_pre_ping=True,  # IMPORTANTE: Verificar que la conexión esté activa
     connect_args={
         "sslmode": "require",
         "sslrootcert": ssl_context
     }
 )
+
+# Para el desarrollo
+# engine = create_engine(
+#     settings.DATABASE_URL.replace('postgresql+asyncpg://', 'postgresql://'),
+#     echo=True,  # Para ver las queries en consola
+#     pool_size=5,
+#     max_overflow=10,
+#     pool_timeout=30,
+#     pool_recycle=1800
+# )
+
 
 SessionLocal = sessionmaker(
     autocommit=False,
