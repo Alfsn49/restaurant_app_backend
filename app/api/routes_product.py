@@ -20,55 +20,31 @@ def list_products_endpoint(
     db: Session = Depends(get_db),
     sucursal_id: str | None = None
 ):
-    productos = list_products_menu(db, sucursal_id)
-    if not productos:
+    productos_data = list_products_menu(db, sucursal_id)
+    
+    if not productos_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No existen productos"
+            detail="No existen productos para esta sucursal"
         )
-
-    resultado = []
-
-    for producto in productos:
-        # Siempre por variantes
-        if producto.variantes and len(producto.variantes) > 0:
-            for variante in producto.variantes:
-                cantidad_actual = 0
-                if variante.inventario:
-                    for inv in variante.inventario:
-                        if sucursal_id is None or inv.sucursal_id == sucursal_id:
-                            cantidad_actual = inv.cantidad
-                            break
-
-                resultado.append({
-                    "producto_id": producto.id,
-                    "product_variante_id": variante.id,
-                    "nombre": f"{variante.nombre}" if variante.nombre else producto.nombre,
-                    "precio": variante.precio,
-                    "disponible": variante.disponible,
-                    "cantidad": cantidad_actual,
-                    "categoria_id": producto.categoria.id,
-                    "categoria": producto.categoria.name,
-                    "image": variante.image,
-                    "zona_id": variante.zona_id,
-                    "zona_nombre": variante.zona.name if variante.zona else None
-                })
-        else:
-            # Si en verdad tienes productos sin variante (raro en tu modelo)
-            resultado.append({
-                "producto_id": producto.id,
-                "product_variante_id": None,
-                "nombre": producto.nombre,
-                "precio": getattr(producto, "precio", None),
-                "disponible": producto.disponible,
-                "cantidad": 0,  # No hay inventario asociado
-                "categoria_id": producto.categoria.id,
-                "categoria": producto.categoria.name,
-                "zona_id": None,
-                "zona_nombre": None
-            })
-
-    return resultado
+    
+    # Transformación directa sin lógica compleja
+    return [
+        {
+            "producto_id": row.producto_id,
+            "product_variante_id": row.variante_id,
+            "nombre": row.variante_nombre or row.producto_nombre,
+            "precio": float(row.precio),
+            "disponible": row.variante_disponible,
+            "cantidad": row.cantidad_inventario,
+            "categoria_id": row.categoria_id,
+            "categoria": row.categoria_nombre,
+            "image": row.image,
+            "zona_id": row.zona_id,
+            "zona_nombre": row.zona_nombre
+        }
+        for row in productos_data
+    ]
 
 
 @router.get("/list/{sucursal_id}", response_model=list[dict])

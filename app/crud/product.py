@@ -1,11 +1,12 @@
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from app.models.product import Product
 from app.models.producto_variante import Producto_Variante
+from app.models.categoria import Categoria
 from app.models.sucursal import Sucursal
 from app.models.zona import Zona
 from app.schemas.product import ProductoCreate, ProductoUpdate
-
+from app.models.inventario import Inventario
 
 def create_product(db: Session, product_data: ProductoCreate):
     sucursal = db.get(Sucursal, product_data.sucursal_id)
@@ -67,27 +68,59 @@ def list_products_sucursal(db: Session, sucursal_id: str):
 
 
 def list_products_menu(db: Session, sucursal_id: str):
-    # Subconsulta: precio mínimo de cada producto
-    precio_min = (
-        select(Producto_Variante.producto_id, func.min(Producto_Variante.precio).label("precio"))
-        .group_by(Producto_Variante.producto_id)
-        .subquery()
-    )
-
-    result = db.execute(
-        select(Product)
-        .join(precio_min, precio_min.c.producto_id == Product.id)
-        .options(
-            selectinload(Product.categoria),
-            selectinload(Product.variantes).selectinload(Producto_Variante.inventario),
-            selectinload(Product.variantes).selectinload(Producto_Variante.zona)
-                .selectinload(Zona.sucursal)
-                .selectinload(Sucursal.local)
+    stmt = (
+        select(
+            Product.id.label("producto_id"),
+            Product.nombre.label("producto_nombre"),
+            Product.disponible.label("producto_disponible"),
+            Product.categoria_id,
+            
+            # Datos de categoría
+            Categoria.name.label("categoria_nombre"),
+            
+            # Datos de variante
+            Producto_Variante.id.label("variante_id"),
+            Producto_Variante.nombre.label("variante_nombre"),
+            Producto_Variante.precio,
+            Producto_Variante.disponible.label("variante_disponible"),
+            Producto_Variante.image,
+            Producto_Variante.zona_id,
+            
+            # Datos de zona
+            Zona.name.label("zona_nombre"),
+            Zona.id.label("zona_id"),
+            
+            # Precio mínimo para ordenamiento
+            func.min(Producto_Variante.precio).over(
+                partition_by=Product.id
+            ).label("precio_minimo_producto"),
+            
+            # Inventario (si lo necesitas)
+            func.coalesce(Inventario.cantidad, 0).label("cantidad_inventario")
         )
-        .where(Product.sucursal_id == sucursal_id)
-        .order_by(precio_min.c.precio.asc())  # 🔑 ordena por el precio mínimo del producto
+        .select_from(Product)
+        .join(Producto_Variante, Producto_Variante.producto_id == Product.id)
+        .join(Categoria, Categoria.id == Product.categoria_id)  # ✅ Join categoría
+        .outerjoin(Zona, Zona.id == Producto_Variante.zona_id)  # ✅ Outer join zona
+        .outerjoin(
+            Inventario, 
+            and_(
+                Inventario.producto_variante_id == Producto_Variante.id,
+                Inventario.sucursal_id == sucursal_id  # ✅ Inventario de esta sucursal
+            )
+        )
+        .where(
+            and_(
+                Product.sucursal_id == sucursal_id,
+                Product.disponible == True,
+                Producto_Variante.disponible == True
+            )
+        )
+        .order_by("precio_minimo_producto", Producto_Variante.precio.asc())
     )
-    return result.scalars().all()
+    
+    result = db.execute(stmt)
+    return result.all()
 
 
 def get_product_id(db: Session, product_id: str):
