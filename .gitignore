@@ -1,8 +1,90 @@
-/venv
-# Ignore .env in the root directory
+# Entornos virtuales de Python
+venv/
+env/
+ENV/
+venv*/
+env*/
+.venv/
+.env/
+
+# Variables de entorno
 .env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
 
-# Ignore .env files in any subdirectory
-**/.env
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
 
-venv
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Alembic migrations (si quieres versionar migraciones, elimina estas líneas)
+#alembic/versions/*
+
+# Cloudinary/Uploads
+uploads/
+media/
+static/uploads/
+
+# Archivos de desarrollo temporal
+*.tmp
+*.temp
+
+# Railway
+railway.toml
+.railway/
