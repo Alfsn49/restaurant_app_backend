@@ -197,12 +197,11 @@ def delete_user_route(
 @router.get("/profile/{user_id}", response_model=UserOut)
 def get_user_profile(
     user_id: str,
-    current_user: dict = Depends(role_required("Administrador", "Dueño")),
-    db: Session = Depends(get_db)  # Cambiado a Session
+    current_user: dict = Depends(role_required("Administrador", "Dueño")),  # Aquí ya se valida
+    db: Session = Depends(get_db)
 ):
-    if current_user["rol"]["nombre"] != "Administrador":
-        raise HTTPException(status_code=403, detail="No tienes permiso")
-    existing_user = get_profile(db, user_id)  # Quitado await
+    # El role_required ya garantiza que es Admin o Dueño
+    existing_user = get_profile(db, user_id)
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
     return existing_user
