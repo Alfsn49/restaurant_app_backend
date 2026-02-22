@@ -49,10 +49,13 @@ def create_product(db: Session, product_data: ProductoCreate):
 def list_products_sucursal(db: Session, sucursal_id: str):
     stmt = (
         select(Product)
-        .outerjoin(Product.variantes)  # incluir productos sin variantes
+        .outerjoin(Product.variantes)
         .outerjoin(Producto_Variante.zona)
         .outerjoin(Zona.sucursal)
-        .where((Sucursal.id == sucursal_id) | (Sucursal.id == None))  # incluir productos sin sucursal
+        .where(
+            (Product.sucursal_id == sucursal_id) |  # ✅ CORREGIDO
+            (Product.sucursal_id == None)  # opcional: incluir productos sin sucursal
+        )
         .options(
             selectinload(Product.categoria),
             selectinload(Product.variantes)
