@@ -387,6 +387,11 @@ def list_ordenes(id_sucursal: str, fecha_inicio: datetime, fecha_fin: datetime, 
     for orden in ordenes:
         if orden.fecha:
             orden.fecha = orden.fecha.replace(tzinfo=ZoneInfo("UTC")).astimezone(ECUADOR_TZ)
+        
+        # ✅ REDONDEAR VALORES MONETARIOS EN CADA DETALLE
+        for detalle in orden.detalles_orden:
+            detalle.precio_unitario = round(detalle.precio_unitario, 2)
+            detalle.subtotal = round(detalle.subtotal, 2)
 
     return ordenes
 
