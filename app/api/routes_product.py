@@ -50,7 +50,7 @@ def list_products_endpoint(
 @router.get("/list/{sucursal_id}", response_model=list[dict])
 def list_products_by_sucursal(
     sucursal_id: str,
-    current_user: dict = Depends(role_required("Administrador", "Dueño")),
+    current_user: dict = Depends(role_required("Administrador", "Dueño", 'Cajero')),
     db: Session = Depends(get_db)
 ):
     productos = list_products_sucursal(db, sucursal_id)
