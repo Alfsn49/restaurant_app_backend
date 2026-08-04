@@ -34,6 +34,6 @@ def listar_ordenes_endpoint(id_sucursal:str,
 
 
 @router.get("/cancelar/{id_orden}")
-def cancelar_ordenes_endpoint(id_orden:str, current_user: dict = Depends(role_required("Administrador", "Dueño")), db: Session = Depends(get_db)):
+def cancelar_ordenes_endpoint(id_orden:str, current_user: dict = Depends(role_required("Administrador", "Dueño", "Cajero")), db: Session = Depends(get_db)):
     orden =  cancelar_orden(id_orden, db)
     return orden
